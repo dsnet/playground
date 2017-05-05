@@ -29,7 +29,9 @@ func TestExecutor(t *testing.T) {
 		return nil
 	}
 
-	ex := newExecutor("go", "gofmt", sendMsgProxy)
+	bs := newBlobStore()
+	gcs := map[string]string{"go-alpha": "go", "go-beta": "go"}
+	ex := newExecutor(bs, "go", "gofmt", gcs, sendMsgProxy)
 	defer ex.Close()
 
 	next := make(chan struct{}, 1)
@@ -90,6 +92,20 @@ func TestExecutor(t *testing.T) {
 			{clearOutput, ""},
 			{appendStderr, "stderr\n"},
 			{statusUpdate, "Program exited.\n"},
+			{statusUpdate, "\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data:   `package main; import "fmt"; func main() { for i := range make([]int, 10) { fmt.Println(i) } }`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Compiling program...\n"},
+			{clearOutput, ""},
+			{appendStdout, "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n"},
+			{statusUpdate, "Program exited.\n"},
+			{statusUpdate, "\n"},
 			{statusStopped, ""},
 		}),
 	}, {
@@ -139,6 +155,159 @@ func TestExecutor(t *testing.T) {
 			{statusUpdate, "\n"},
 			{statusStopped, ""},
 		}),
+	}, {
+		action: actionRun,
+		data: `//playground:goversions go-bad
+			package main; func main() {}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Unknown Go version: go-bad\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:pprof mode-bad
+			package main; import "testing"; func Benchmark(b *testing.B) {}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Unknown profiling argument: mode-bad\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:arg0 "arg2...
+			package main; func main(){}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Unable to parse magic comment: \"//playground:arg0 \\\"arg2...\""},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:unknown arg1 arg2 arg3
+			package main; func main(){}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Unknown magic comment: \"//playground:unknown arg1 arg2 arg3\""},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:pprof cpu mem
+			package main; func main(){}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Profiling is only available on test suites"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:goversions go-alpha go-beta
+			package main; import "fmt"; func main() { fmt.Println("hello") }`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Compiling program... (command: go build main.go)\n"},
+			{statusUpdate, "Starting program... (command: ./main)\n"},
+			{appendStdout, "hello\n"},
+			{statusUpdate, "Program exited.\n"},
+			{statusUpdate, "\n"},
+			{statusUpdate, "Compiling program... (command: go build main.go)\n"},
+			{statusUpdate, "Starting program... (command: ./main)\n"},
+			{appendStdout, "hello\n"},
+			{statusUpdate, "Program exited.\n"},
+			{statusUpdate, "\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:buildargs -race
+			package main
+			func main() {
+				var x int // Race over this variable
+				c := make(chan bool)
+				for i := 0; i < 10; i++ {
+					go func(i int) { x = i; c<-true }(i)
+				}
+				for i := 0; i < 10; i++ { <-c }
+			}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Compiling program... (command: go build -race main.go)\n"},
+			{statusUpdate, "Starting program... (command: ./main)\n"},
+			{appendStderr, "RE> WARNING: DATA RACE"},
+			{statusUpdate, "RE> Unexpected error: .*\n"},
+			{statusUpdate, "\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:execargs -myflag=1337
+			package main
+			import "fmt"
+			import "flag"
+			func main() {
+				x := flag.Int("myflag", 0, "")
+				flag.Parse()
+				fmt.Println(*x)
+			}`,
+		recvMsg: wantMessages(t, done, []message{
+			{statusStarted, ""},
+			{clearOutput, ""},
+			{statusUpdate, "Compiling program... (command: go build main.go)\n"},
+			{statusUpdate, "Starting program... (command: ./main -myflag=1337)\n"},
+			{appendStdout, "1337\n"},
+			{statusUpdate, "Program exited.\n"},
+			{statusUpdate, "\n"},
+			{statusStopped, ""},
+		}),
+	}, {
+		action: actionRun,
+		data: `//playground:pprof cpu mem
+			package main
+			import "testing"
+			import "strings"
+			var sink []string
+			func Benchmark(b *testing.B) {
+				d := strings.Repeat("x ☺ ", 1<<20)
+				for i:= 0; i < b.N; i++ {
+					sink = strings.Fields(d)
+				}
+			}`,
+		// This takes a while because it runs benchmarks and generates profiles,
+		// which sometimes are not generated if the test was too short.
+		// Thus, we only test that we were able to see at least one profile.
+		recvMsg: func() func(action, data string) {
+			var hasStarted, hasProfile, hasStopped bool
+			return func(action, data string) {
+				switch {
+				case !hasStarted:
+					if action == statusStarted {
+						hasStarted = true
+					}
+				case !hasProfile:
+					if action == reportProfile {
+						if !strings.Contains(data, "name") || !strings.Contains(data, "id") {
+							t.Errorf("invalid reportProfile: %v", data)
+						}
+						hasProfile = true
+					}
+				case !hasStopped:
+					if action == statusStopped {
+						done()
+						hasStopped = true
+					}
+				default:
+					t.Errorf("got unexpected message{action: %s, data: %q}", action, data)
+				}
+			}
+		}(),
 	}}
 
 	for i, tt := range tests {
@@ -166,7 +335,7 @@ func TestExecutor(t *testing.T) {
 				if t.Failed() {
 					t.Fatalf("test %d, failed test", i)
 				}
-			case <-time.After(10 * time.Second):
+			case <-time.After(30 * time.Second):
 				t.Fatalf("test %d: timed out", i)
 			}
 		}
@@ -176,6 +345,9 @@ func TestExecutor(t *testing.T) {
 	ex.Close()
 	if _, err := os.Stat(ex.tmpDir); err == nil {
 		t.Errorf("unexpected Stat(%q) success", ex.tmpDir)
+	}
+	if n := bs.Len(); n > 0 {
+		t.Errorf("unexpected non-empty blobStore: got %d blobs", n)
 	}
 }
 
