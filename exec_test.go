@@ -34,9 +34,38 @@ func TestExecutor(t *testing.T) {
 	ex := newExecutor(bs, "go", "gofmt", gcs, sendMsgProxy)
 	defer ex.Close()
 
-	next := make(chan struct{}, 1)
-	done := func() { next <- struct{}{} }
+	var tsub *testing.T            // Updated for each sub-test
+	next := make(chan struct{}, 1) // Event triggered at end of each test
+
+	// wantMessages creates a function callback for checking new messages that
+	// they match the wanted messages. The callback will automatically send
+	// on next when done.
+	wantMessages := func(want []message) func(action, data string) {
+		var got []message
+		return func(action, data string) {
+			isAppend := action == appendStdout || action == appendStderr
+			if len(got) > 0 && got[len(got)-1].action == action && isAppend {
+				got[len(got)-1].data += data
+			} else {
+				got = append(got, message{action, data})
+			}
+
+			if !isAppend && len(got) == len(want) {
+				if !equalMessages(got, want) {
+					tsub.Errorf("mismatching messages:\ngot  %q\nwant %q", got, want)
+				}
+				next <- struct{}{} // Inform that the test is done
+			}
+			if len(got) > len(want) {
+				tsub.Errorf("got unexpected message{action: %s, data: %q}", action, data)
+			}
+
+		}
+	}
+
 	tests := []struct {
+		label string // Name of the test
+
 		action string
 		data   string
 
@@ -45,11 +74,13 @@ func TestExecutor(t *testing.T) {
 		// After the test is done, this must send on the next chan exactly once.
 		recvMsg func(action, data string)
 	}{{
+		label:  "StopNoop",
 		action: actionStop,
 	}, {
+		label:  "FormatValid",
 		action: actionFormat,
 		data:   `package main;import "fmt"; func main() { fmt.Println("Hello, world!") }`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Formatting source...\n"},
@@ -59,9 +90,10 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "FormatInvalid",
 		action: actionFormat,
 		data:   "package main\n\n\nnot valid go",
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Formatting source...\n"},
@@ -71,9 +103,10 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunInvalid",
 		action: actionRun,
 		data:   "package main\n\n\nnot valid go",
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program...\n"},
@@ -83,9 +116,10 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunValid1",
 		action: actionRun,
 		data:   `package main; import "fmt"; import "os"; func main() { fmt.Fprintln(os.Stderr, "stderr") }`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program...\n"},
@@ -96,9 +130,10 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunValid2",
 		action: actionRun,
 		data:   `package main; import "fmt"; func main() { for i := range make([]int, 10) { fmt.Println(i) } }`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program...\n"},
@@ -109,27 +144,30 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunBadPackage",
 		action: actionRun,
 		data:   `package foo; func main(){}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Program must be in 'package main'.\n"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunBadMain",
 		action: actionRun,
 		data:   `package main; func Main(){}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Program must have either a main function or a set of test functions.\n"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunTest",
 		action: actionRun,
 		data:   `package main; import "testing"; func Test(t *testing.T){t.Error("test error")}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program...\n"},
@@ -140,76 +178,84 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "RunForever",
 		action: actionRun,
 		data:   `package main; import "time"; func main() { time.Sleep(time.Hour) }`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program...\n"},
 			{clearOutput, ""},
 		}),
 	}, {
+		label:  "StopPrevious",
 		action: actionStop,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusUpdate, "RE> Unexpected error:.*\n"},
 			{statusUpdate, "\n"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaBadVersions",
 		action: actionRun,
 		data: `//playground:goversions go-bad
 			package main; func main() {}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Unknown Go version: go-bad\n"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaBadPProfArgs",
 		action: actionRun,
 		data: `//playground:pprof mode-bad
 			package main; import "testing"; func Benchmark(b *testing.B) {}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Unknown profiling argument: mode-bad\n"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaBadSyntax",
 		action: actionRun,
 		data: `//playground:arg0 "arg2...
 			package main; func main(){}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Unable to parse magic comment: \"//playground:arg0 \\\"arg2...\""},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaUnknown",
 		action: actionRun,
 		data: `//playground:unknown arg1 arg2 arg3
 			package main; func main(){}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Unknown magic comment: \"//playground:unknown arg1 arg2 arg3\""},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaBadPProfUsage",
 		action: actionRun,
 		data: `//playground:pprof cpu mem
 			package main; func main(){}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Profiling is only available on test suites"},
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaVersions",
 		action: actionRun,
 		data: `//playground:goversions go-alpha go-beta
 			package main; import "fmt"; func main() { fmt.Println("hello") }`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program... (command: go build main.go)\n"},
@@ -225,6 +271,7 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaBuildArgs",
 		action: actionRun,
 		data: `//playground:buildargs -race
 			package main
@@ -236,7 +283,7 @@ func TestExecutor(t *testing.T) {
 				}
 				for i := 0; i < 10; i++ { <-c }
 			}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program... (command: go build -race main.go)\n"},
@@ -247,6 +294,7 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaExecArgs",
 		action: actionRun,
 		data: `//playground:execargs -myflag=1337
 			package main
@@ -257,7 +305,7 @@ func TestExecutor(t *testing.T) {
 				flag.Parse()
 				fmt.Println(*x)
 			}`,
-		recvMsg: wantMessages(t, done, []message{
+		recvMsg: wantMessages([]message{
 			{statusStarted, ""},
 			{clearOutput, ""},
 			{statusUpdate, "Compiling program... (command: go build main.go)\n"},
@@ -268,18 +316,19 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		}),
 	}, {
+		label:  "PragmaPProfArgs",
 		action: actionRun,
 		data: `//playground:pprof cpu mem
-			package main
-			import "testing"
-			import "strings"
-			var sink []string
-			func Benchmark(b *testing.B) {
-				d := strings.Repeat("x ☺ ", 1<<20)
-				for i:= 0; i < b.N; i++ {
-					sink = strings.Fields(d)
-				}
-			}`,
+				package main
+				import "testing"
+				import "strings"
+				var sink []string
+				func Benchmark(b *testing.B) {
+					d := strings.Repeat("x ☺ ", 1<<20)
+					for i:= 0; i < b.N; i++ {
+						sink = strings.Fields(d)
+					}
+				}`,
 		// This takes a while because it runs benchmarks and generates profiles,
 		// which sometimes are not generated if the test was too short.
 		// Thus, we only test that we were able to see at least one profile.
@@ -294,51 +343,54 @@ func TestExecutor(t *testing.T) {
 				case !hasProfile:
 					if action == reportProfile {
 						if !strings.Contains(data, "name") || !strings.Contains(data, "id") {
-							t.Errorf("invalid reportProfile: %v", data)
+							tsub.Errorf("invalid reportProfile: %v", data)
 						}
 						hasProfile = true
 					}
 				case !hasStopped:
 					if action == statusStopped {
-						done()
+						next <- struct{}{}
 						hasStopped = true
 					}
 				default:
-					t.Errorf("got unexpected message{action: %s, data: %q}", action, data)
+					tsub.Errorf("got unexpected message{action: %s, data: %q}", action, data)
 				}
 			}
 		}(),
 	}}
 
-	for i, tt := range tests {
-		mu.Lock()
-		sendMsg = tt.recvMsg
-		if tt.recvMsg == nil {
-			sendMsg = func(_, _ string) {} // Avoid nil panic
-		}
-		mu.Unlock()
-
-		t.Logf("starting test %d, action: %s, data: %q", i, tt.action, tt.data)
-		switch tt.action {
-		case actionFormat, actionRun:
-			ex.Start(tt.action, tt.data)
-		case actionStop:
-			ex.Stop()
-		default:
-			t.Fatalf("test %d, unknown action: %s", i, tt.action)
-		}
-
-		// Wait until this test is done.
-		if tt.recvMsg != nil {
-			select {
-			case <-next:
-				if t.Failed() {
-					t.Fatalf("test %d, failed test", i)
-				}
-			case <-time.After(30 * time.Second):
-				t.Fatalf("test %d: timed out", i)
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			// Setup the current sendMsg and tsub for the given test.
+			mu.Lock()
+			tsub = t
+			sendMsg = tt.recvMsg
+			if tt.recvMsg == nil {
+				sendMsg = func(_, _ string) {} // Avoid nil panic
 			}
-		}
+			mu.Unlock()
+
+			switch tt.action {
+			case actionFormat, actionRun:
+				ex.Start(tt.action, tt.data)
+			case actionStop:
+				ex.Stop()
+			default:
+				t.Fatalf("unknown action: %s", tt.action)
+			}
+
+			// Wait until this test is done.
+			if tt.recvMsg != nil {
+				select {
+				case <-next:
+					if t.Failed() {
+						t.Fatalf("failed test")
+					}
+				case <-time.After(30 * time.Second):
+					t.Fatalf("timed out")
+				}
+			}
+		})
 	}
 
 	// Test resource cleanup.
@@ -348,29 +400,6 @@ func TestExecutor(t *testing.T) {
 	}
 	if n := bs.Len(); n > 0 {
 		t.Errorf("unexpected non-empty blobStore: got %d blobs", n)
-	}
-}
-
-func wantMessages(t *testing.T, done func(), want []message) func(action, data string) {
-	var got []message
-	return func(action, data string) {
-		isAppend := action == appendStdout || action == appendStderr
-		if len(got) > 0 && got[len(got)-1].action == action && isAppend {
-			got[len(got)-1].data += data
-		} else {
-			got = append(got, message{action, data})
-		}
-
-		if !isAppend && len(got) == len(want) {
-			if !equalMessages(got, want) {
-				t.Errorf("mismatching messages:\ngot  %q\nwant %q", got, want)
-			}
-			done()
-		}
-		if len(got) > len(want) {
-			t.Errorf("got unexpected message{action: %s, data: %q}", action, data)
-		}
-
 	}
 }
 
