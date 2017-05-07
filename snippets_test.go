@@ -241,6 +241,8 @@ func TestDatabase(t *testing.T) {
 	}, {
 		TestUpdate{in: snippet{ID: 18, Code: "code18a"}, id: 18}, "", step,
 	}, {
+		TestUpdate{in: snippet{ID: 1, Code: "code0a"}, id: 1}, "", step,
+	}, {
 		TestUpdate{in: snippet{ID: 10, Code: "code10a"}, id: 10}, "", step,
 	}, {
 		TestUpdate{in: snippet{ID: 11, Code: "code11a"}, id: 11}, "", step,
@@ -254,16 +256,17 @@ func TestDatabase(t *testing.T) {
 		}}, "", step,
 	}, {
 		TestQueryByModified{limit: 5, out: []snippet{
-			{ID: 11, Created: base.Add(34 * step), Modified: base.Add(46 * step), Name: "user datagram protocol", Code: "code11a"},
-			{ID: 10, Created: base.Add(33 * step), Modified: base.Add(45 * step), Name: "transport control protocol", Code: "code10a"},
+			{ID: 11, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
+			{ID: 10, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
+			{ID: 1, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
 			{ID: 18, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
 			{ID: 8, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
-			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
 		}}, "", step,
 	}, {
 		TestReopen{}, "", step,
 	}, {
-		TestQueryByModified{modified: base.Add(43 * step), id: 7, limit: 10, out: []snippet{
+		TestQueryByModified{modified: base.Add(43 * step), id: 8, limit: 10, out: []snippet{
+			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
 			{ID: 6, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
 			{ID: 17, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
 			{ID: 16, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
@@ -273,15 +276,38 @@ func TestDatabase(t *testing.T) {
 			{ID: 12, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
 			{ID: 9, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
 			{ID: 5, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
-			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
 		}}, "", step,
 	}, {
-		TestQueryByModified{modified: base.Add(14 * step), id: 3, limit: 10, out: []snippet{
+		TestQueryByModified{modified: base.Add(28 * step), id: 5, limit: 10, out: []snippet{
+			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
 			{ID: 4, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
-			{ID: 1, Modified: base.Add(5 * step), Name: "Default snippet", Code: "code1"},
 		}}, "", step,
 	}, {
 		TestQueryByModified{modified: base.Add(0 * step), id: 1, limit: 10, out: []snippet{}}, "", step,
+	}, {
+		TestQueryByModified{limit: 0}, "", step,
+	}, {
+		TestQueryByID{limit: 0}, "", step,
+	}, {
+		TestQueryByID{limit: -1, out: []snippet{
+			{ID: 1, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
+			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
+			{ID: 4, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
+			{ID: 5, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
+			{ID: 6, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
+			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
+			{ID: 8, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
+			{ID: 9, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
+			{ID: 10, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
+			{ID: 11, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
+			{ID: 12, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
+			{ID: 13, Created: base.Add(37 * step), Modified: base.Add(37 * step), Name: "green tea", Code: "code13"},
+			{ID: 14, Created: base.Add(38 * step), Modified: base.Add(38 * step), Name: "cherry tea", Code: "code14"},
+			{ID: 15, Created: base.Add(39 * step), Modified: base.Add(39 * step), Name: "java tea", Code: "code15"},
+			{ID: 16, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
+			{ID: 17, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
+			{ID: 18, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
+		}}, "", step,
 	}}
 
 	for i, tt := range tests {

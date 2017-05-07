@@ -5,7 +5,9 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"math"
@@ -13,22 +15,25 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/asdine/storm"
+	"github.com/boltdb/bolt"
 )
 
 const (
-	boltFile    = "snippets.boltdb"
+	boltFile     = "snippets.boltdb"
+	bucketByID   = "SnippetsByID"
+	bucketByDate = "SnippetsByModified"
+
 	defaultID   = 1
 	defaultName = "Default snippet"
 	defaultCode = "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello, 世界\")\n}\n"
 )
 
 var (
-	zeroTime = time.Time{} // Use instead of IsZero since we want exact zero for struct
-	maxTime  = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
-	maxID    = int64(math.MaxInt64 / 2) // Divide-by-two to avoid overflow in storm library
+	maxTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+	maxID   = int64(math.MaxInt64)
 )
 
 // requestError is an error type indicating the user provided bad input.
@@ -37,81 +42,157 @@ type requestError struct{ error }
 
 // errNotFound indicates that the error was not found.
 // This error can be converted to an HTTP status 404 code.
-var errNotFound = storm.ErrNotFound
+var errNotFound = errors.New("not found")
 
 type snippet struct {
-	ID       int64     `storm:"index,increment"`
-	Created  time.Time `storm:"index"`
-	Modified time.Time `storm:"index"`
-	Name     string
-	Code     string
+	// These fields are only updated by the database.
+	ID       int64     `json:"id"`
+	Created  time.Time `json:"created"`
+	Modified time.Time `json:"modified"`
+
+	Name string `json:"name"`
+	Code string `json:"code,omitempty"`
+}
+
+func (s *snippet) MarshalBinary() ([]byte, error) {
+	type st snippet
+	bb := new(bytes.Buffer)
+	enc := gob.NewEncoder(bb)
+	err := enc.Encode((*st)(s))
+	return bb.Bytes(), err
+}
+
+func (s *snippet) UnmarshalBinary(b []byte) error {
+	type st snippet
+	br := bytes.NewReader(b)
+	dec := gob.NewDecoder(br)
+	return dec.Decode((*st)(s))
+}
+
+func idKey(id int64) []byte {
+	// Offset the int64 values sort that they sort nicely as uint64.
+	var k [8]byte
+	binary.BigEndian.PutUint64(k[:], uint64(id+math.MaxInt64+1))
+	return k[:]
+}
+
+func dualKey(id int64, mod time.Time) []byte {
+	// Offset the int64 values sort that they sort nicely as uint64.
+	var k [20]byte
+	binary.BigEndian.PutUint64(k[:8], uint64(mod.Unix()+math.MaxInt64+1))
+	binary.BigEndian.PutUint32(k[8:12], uint32(mod.Nanosecond()))
+	binary.BigEndian.PutUint64(k[12:], uint64(id+math.MaxInt64+1))
+	return k[:]
 }
 
 type database struct {
-	db      *storm.DB
-	mu      sync.Mutex       // Protects names
-	names   map[int64]string // Mapping from IDs to names
+	db     *bolt.DB
+	lastID int64
+
+	mu      sync.Mutex // Protects names
+	names   map[int64]string
 	timeNow func() time.Time
 }
 
 func openDatabase(path string) (*database, error) {
 	// Open the BoltDB file.
 	var once sync.Once
-	db, err := storm.Open(filepath.Join(path, boltFile))
+	db, err := bolt.Open(filepath.Join(path, boltFile), 0644, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer once.Do(func() { db.Close() })
-	if err := storm.Codec(codec{})(db); err != nil {
-		return nil, err
-	}
 
-	// Cache all of the snippet names.
+	// Get the last snippet ID and all names.
+	lastID := int64(-1)
 	names := make(map[int64]string)
-	var ss []snippet
-	if err := db.All(&ss); err != nil {
+	if err := db.View(func(tx *bolt.Tx) error {
+		bkt := tx.Bucket([]byte(bucketByID))
+		if bkt == nil {
+			return nil
+		}
+		c := bkt.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var s snippet
+			if err := s.UnmarshalBinary(v); err != nil {
+				return err
+			}
+			names[s.ID] = strings.ToLower(s.Name)
+			lastID = s.ID
+		}
+		return nil
+	}); err != nil {
 		return nil, err
-	}
-	for _, s := range ss {
-		names[s.ID] = strings.ToLower(s.Name)
 	}
 
 	// Create default snippet.
-	if len(names) == 0 {
-		s := &snippet{Name: defaultName, Code: defaultCode}
-		if err := db.Save(s); err != nil {
+	if lastID == -1 {
+		s := snippet{ID: defaultID, Name: defaultName, Code: defaultCode}
+		err := db.Update(func(tx *bolt.Tx) error {
+			bktByID, err := tx.CreateBucketIfNotExists([]byte(bucketByID))
+			if err != nil {
+				return err
+			}
+			bktByDate, err := tx.CreateBucketIfNotExists([]byte(bucketByDate))
+			if err != nil {
+				return err
+			}
+
+			v, _ := s.MarshalBinary()
+			if err := bktByID.Put(idKey(s.ID), v); err != nil {
+				return err
+			}
+			if err := bktByDate.Put(dualKey(s.ID, s.Modified), nil); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
 			return nil, err
 		}
-		if s.ID != defaultID {
-			return nil, errors.New("invalid ID for default snippet")
-		}
-		names[s.ID] = strings.ToLower(defaultName)
+		lastID = s.ID
 	}
 
 	once.Do(func() {}) // Avoid closing database
-	return &database{db: db, names: names, timeNow: time.Now}, nil
+	return &database{db: db, lastID: lastID, names: names, timeNow: time.Now}, nil
 }
 
 // QueryByModified returns a list of snippets younger than the last time.
 // The list is sorted in descending order by time (and by ID on equal times).
 func (db *database) QueryByModified(lastTime time.Time, lastID int64, limit int) ([]snippet, error) {
-	if lastTime == zeroTime && lastID == 0 {
+	if lastTime.IsZero() && lastID == 0 {
 		lastTime, lastID = maxTime, maxID // Find everything
 	}
 	var ss []snippet
-	err := db.db.Range("Modified", zeroTime, lastTime, &ss, storm.Limit(limit), storm.Reverse())
-	if err == errNotFound {
-		err = nil
-	}
-	after := func(s snippet) bool {
-		if s.Modified.Equal(lastTime) {
-			return s.ID >= lastID
+	err := db.db.View(func(tx *bolt.Tx) error {
+		// Seek to the latest value that is immediately before the search key.
+		bktByDate := tx.Bucket([]byte(bucketByDate))
+		c := bktByDate.Cursor()
+		sk := dualKey(lastID, lastTime)
+		k, _ := c.Seek(sk)
+		if k == nil {
+			k, _ = c.Last()
 		}
-		return s.Modified.After(lastTime)
-	}
-	for len(ss) > 0 && after(ss[0]) {
-		ss = ss[1:]
-	}
+
+		// Iterate through all results.
+		ss = nil
+		bktByID := tx.Bucket([]byte(bucketByID))
+		for ; k != nil; k, _ = c.Prev() {
+			if len(ss) >= limit && limit >= 0 {
+				break
+			}
+			if bytes.Compare(k, sk) >= 0 {
+				continue
+			}
+			var s snippet
+			v := bktByID.Get(k[12:20]) // Extract ID from dual key
+			if err := s.UnmarshalBinary(v); err != nil {
+				return err
+			}
+			ss = append(ss, s)
+		}
+		return nil
+	})
 	return ss, err
 }
 
@@ -119,10 +200,24 @@ func (db *database) QueryByModified(lastTime time.Time, lastID int64, limit int)
 // The list is sorted in ascending order by ID.
 func (db *database) QueryByID(lastID int64, limit int) ([]snippet, error) {
 	var ss []snippet
-	err := db.db.Range("ID", lastID+1, maxID, &ss, storm.Limit(limit))
-	if err == errNotFound {
-		err = nil
-	}
+	err := db.db.View(func(tx *bolt.Tx) error {
+		// Iterate through all results.
+		ss = nil
+		bktByID := tx.Bucket([]byte(bucketByID))
+		c := bktByID.Cursor()
+		sk := idKey(lastID + 1)
+		for k, v := c.Seek(sk); k != nil; k, v = c.Next() {
+			if len(ss) >= limit && limit >= 0 {
+				break
+			}
+			var s snippet
+			if err := s.UnmarshalBinary(v); err != nil {
+				return err
+			}
+			ss = append(ss, s)
+		}
+		return nil
+	})
 	return ss, err
 }
 
@@ -171,17 +266,18 @@ func (db *database) QueryByName(name string, limit int) ([]snippet, error) {
 		}
 		return ms[i].n > ms[j].n
 	})
-	if len(ms) > limit && limit >= 0 {
+	for len(ms) > limit && limit >= 0 {
 		ms = ms[:limit]
 	}
 
 	// Retrieve all snippets for the remaining IDs.
 	var ss []snippet
 	for _, m := range ms {
-		var s snippet
-		if err := db.db.One("ID", m.id, &s); err == storm.ErrNotFound {
+		s, err := db.Retrieve(m.id)
+		if err == errNotFound {
 			continue
-		} else if err != nil {
+		}
+		if err != nil {
 			return nil, err
 		}
 		ss = append(ss, s)
@@ -198,26 +294,48 @@ func (db *database) Create(s snippet) (int64, error) {
 	case s.ID != 0:
 		return 0, requestError{errors.New("cannot assign ID when creating snippet")}
 	}
-	s.Created = db.timeNow().UTC().AddDate(0, 0, 0)
-	s.Modified = s.Created
-	if err := db.db.Save(&s); err != nil {
-		return 0, err
+	s.ID = atomic.AddInt64(&db.lastID, 1)
+	err := db.db.Update(func(tx *bolt.Tx) error {
+		s.Created = db.timeNow().UTC().AddDate(0, 0, 0)
+		s.Modified = s.Created
+
+		// Store the snippet.
+		v, _ := s.MarshalBinary()
+		bktByID := tx.Bucket([]byte(bucketByID))
+		if err := bktByID.Put(idKey(s.ID), v); err != nil {
+			return err
+		}
+		bktByDate := tx.Bucket([]byte(bucketByDate))
+		if err := bktByDate.Put(dualKey(s.ID, s.Modified), nil); err != nil {
+			return err
+		}
+		return nil
+	})
+	if s.ID > 0 && err == nil {
+		db.mu.Lock()
+		db.names[s.ID] = strings.ToLower(s.Name)
+		db.mu.Unlock()
 	}
-	db.mu.Lock()
-	db.names[s.ID] = strings.ToLower(s.Name)
-	db.mu.Unlock()
-	return s.ID, nil
+	return s.ID, err
 }
 
 // Retrieves a snippet by the specified ID.
 // If the snippet does not exist, this returns errNotFound.
 func (db *database) Retrieve(id int64) (snippet, error) {
 	var s snippet
-	err := db.db.One("ID", id, &s)
+	err := db.db.View(func(tx *bolt.Tx) error {
+		bktByID := tx.Bucket([]byte(bucketByID))
+		v := bktByID.Get(idKey(id))
+		if v == nil {
+			return errNotFound
+		}
+		return s.UnmarshalBinary(v)
+	})
 	return s, err
 }
 
 // Update updates the provided snippet at the given ID.
+// The ID field in the snippet is optional as long as id is valid.
 // Only the Name and Code of a snippet may be changed.
 // If the snippet does not exist, this returns errNotFound.
 func (db *database) Update(s snippet, id int64) error {
@@ -228,20 +346,52 @@ func (db *database) Update(s snippet, id int64) error {
 		return requestError{fmt.Errorf("snippet IDs do not match: %d != %d", id, s.ID)}
 	case s.ID == defaultID && s.Name != "" && s.Name != defaultName:
 		return requestError{errors.New("cannot change default snippet name")}
-	case s.Modified != zeroTime || s.Created != zeroTime:
+	case !s.Modified.IsZero() || !s.Created.IsZero():
 		return requestError{errors.New("cannot set modified or created times")}
 	}
-	s.ID = id
-	s.Modified = db.timeNow().UTC().AddDate(0, 0, 0)
-	if err := db.db.Update(&s); err != nil {
-		return err
-	}
-	if s.Name != "" {
+	err := db.db.Update(func(tx *bolt.Tx) error {
+		// Locate the snippet associated with s.ID.
+		bktByID := tx.Bucket([]byte(bucketByID))
+		v := bktByID.Get(idKey(id))
+		if v == nil {
+			return errNotFound
+		}
+		var s2 snippet
+		if err := s2.UnmarshalBinary(v); err != nil {
+			return err
+		}
+
+		// Update bucketsByID with the new value.
+		if s.Name != "" {
+			s2.Name = s.Name
+		}
+		if s.Code != "" {
+			s2.Code = s.Code
+		}
+		oldKey := dualKey(s2.ID, s2.Modified)
+		s2.Modified = db.timeNow().UTC().AddDate(0, 0, 0)
+		newKey := dualKey(s2.ID, s2.Modified)
+		v2, err := s2.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		if err := bktByID.Put(idKey(id), v2); err != nil {
+			return err
+		}
+
+		// Update bucketsByDate.
+		bktByDate := tx.Bucket([]byte(bucketByDate))
+		if err := bktByDate.Delete(oldKey); err != nil {
+			return err
+		}
+		return bktByDate.Put(newKey, nil)
+	})
+	if id > 0 && s.Name != "" && err == nil {
 		db.mu.Lock()
-		db.names[s.ID] = strings.ToLower(s.Name)
+		db.names[id] = strings.ToLower(s.Name)
 		db.mu.Unlock()
 	}
-	return nil
+	return err
 }
 
 // Delete deletes a snippet by the provided ID.
@@ -251,39 +401,33 @@ func (db *database) Delete(id int64) error {
 	if id == 0 || id == defaultID {
 		return requestError{fmt.Errorf("cannot delete snippet (ID: %d)", id)}
 	}
-	if err := db.db.DeleteStruct(&snippet{ID: id}); err != nil {
-		return err
+	err := db.db.Update(func(tx *bolt.Tx) error {
+		// Locate and delete key from bucketsByID.
+		bktByID := tx.Bucket([]byte(bucketByID))
+		v := bktByID.Get(idKey(id))
+		if v == nil {
+			return errNotFound
+		}
+		if err := bktByID.Delete(idKey(id)); err != nil {
+			return err
+		}
+
+		// Delete key from bucketsByDate.
+		var s snippet
+		if err := s.UnmarshalBinary(v); err != nil {
+			return err
+		}
+		k := dualKey(s.ID, s.Modified)
+		return tx.Bucket([]byte(bucketByDate)).Delete(k)
+	})
+	if err == nil {
+		db.mu.Lock()
+		delete(db.names, id)
+		db.mu.Unlock()
 	}
-	db.mu.Lock()
-	delete(db.names, id)
-	db.mu.Unlock()
-	return nil
+	return err
 }
 
 func (db *database) Close() error {
 	return db.db.Close()
-}
-
-type codec struct{}
-
-func (codec) Marshal(v interface{}) ([]byte, error) {
-	switch v := v.(type) {
-	case time.Time:
-		return v.MarshalBinary()
-	case *snippet:
-		return json.Marshal(v)
-	}
-	return nil, fmt.Errorf("unknown type: %T", v)
-}
-func (codec) Unmarshal(b []byte, v interface{}) error {
-	switch v := v.(type) {
-	case *time.Time:
-		return v.UnmarshalBinary(b)
-	case *snippet:
-		return json.Unmarshal(b, v)
-	}
-	return fmt.Errorf("unknown type: %T", v)
-}
-func (codec) Name() string {
-	return ""
 }
