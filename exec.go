@@ -506,15 +506,7 @@ func (ex *executor) processProfiles(profArgs []string) {
 		if len(b) > 1<<24 {
 			ex.sendMsg(statusUpdate, fmt.Sprintf("\tDropped report: %s (file too large: %d bytes)\n", output, len(b)))
 		} else if len(b) > 0 {
-			var mime string
-			if strings.HasSuffix(output, ".svg") {
-				mime = "image/svg+xml"
-			}
-			if strings.HasSuffix(output, ".html") {
-				mime = "text/html"
-			}
-
-			id := ex.bs.Insert(blob{data: b, mime: mime})
+			id := ex.bs.Insert(blob{data: b, mime: mimeFromPath(output)})
 			ex.mu.Lock()
 			ex.bids = append(ex.bids, id) // Make sure executor knows to delete this later
 			ex.mu.Unlock()
