@@ -17,6 +17,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -125,7 +126,7 @@ func main() {
 		}()
 
 		// mimeTypes is a mapping from file extensions to MIME types.
-		var mimeTypes = %#v
+		var mimeTypes = map[string]string{%s}
 
 		// mimeFromPath returns the MIME type based on the file extension in the path.
 		func mimeFromPath(p string) string {
@@ -134,7 +135,7 @@ func main() {
 			}
 			return ""
 		}`
-	gen := fmt.Sprintf(template, bx.Bytes(), mimeTypes)
+	gen := fmt.Sprintf(template, bx.Bytes(), formatMap(mimeTypes))
 	out, err := format.Source([]byte(gen))
 	if err != nil {
 		log.Fatalf("format.Source error: %v", err)
@@ -149,4 +150,16 @@ func main() {
 func knownExtension(p string) bool {
 	i := strings.LastIndexByte(p, '.')
 	return i >= 0 && mimeTypes[p[i+1:]] != ""
+}
+
+func formatMap(m map[string]string) string {
+	var ks, ss []string
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	for _, k := range ks {
+		ss = append(ss, fmt.Sprintf("%q:%q", k, m[k]))
+	}
+	return strings.Join(ss, ",")
 }

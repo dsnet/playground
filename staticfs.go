@@ -27,7 +27,7 @@ var staticFS = func() (m map[string][]byte) {
 }()
 
 // mimeTypes is a mapping from file extensions to MIME types.
-var mimeTypes = map[string]string{"woff": "font/woff", "css": "text/css; charset=utf-8", "html": "text/html; charset=utf-8", "ico": "image/x-icon", "js": "application/javascript", "svg": "image/svg+xml"}
+var mimeTypes = map[string]string{"css": "text/css; charset=utf-8", "html": "text/html; charset=utf-8", "ico": "image/x-icon", "js": "application/javascript", "svg": "image/svg+xml", "woff": "font/woff"}
 
 // mimeFromPath returns the MIME type based on the file extension in the path.
 func mimeFromPath(p string) string {
