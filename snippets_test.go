@@ -114,11 +114,11 @@ func TestDatabase(t *testing.T) {
 	}, {
 		TestRetrieve{id: defaultID + 1}, "IsNotFound", step,
 	}, {
-		TestQueryByID{id: 0, limit: 10, out: []snippet{
+		TestQueryByID{limit: 10, out: []snippet{
 			snippet{ID: defaultID, Name: defaultName, Code: defaultCode},
 		}}, "", step,
 	}, {
-		TestQueryByID{id: 1, limit: 10, out: []snippet{}}, "", step,
+		TestQueryByID{id: defaultID, limit: 10, out: []snippet{}}, "", step,
 	}, {
 		TestUpdate{in: snippet{
 			ID: defaultID, Code: "code1",
@@ -133,15 +133,15 @@ func TestDatabase(t *testing.T) {
 		}}, "", step,
 	}, {
 		TestCreate{
-			in: snippet{Name: "resonance cascade", Code: "code2"}, id: 2,
+			in: snippet{Name: "resonance cascade", Code: "code2"}, id: defaultID + 1,
 		}, "", step,
 	}, {
 		TestCreate{
-			in: snippet{Name: "gordon freeman", Code: "code3"}, id: 3,
+			in: snippet{Name: "gordon freeman", Code: "code3"}, id: defaultID + 2,
 		}, "", step,
 	}, {
 		TestCreate{
-			in: snippet{Name: "live free die hard", Code: "code4"}, id: 4,
+			in: snippet{Name: "live free die hard", Code: "code4"}, id: defaultID + 3,
 		}, "", step,
 	}, {
 		TestCreate{
@@ -149,164 +149,164 @@ func TestDatabase(t *testing.T) {
 		}, "IsAny", step,
 	}, {
 		TestCreate{
-			in: snippet{ID: 5, Name: "assign id", Code: "code"}, id: 0,
+			in: snippet{ID: defaultID + 4, Name: "assign id", Code: "code"}, id: 0,
 		}, "IsAny", step,
 	}, {
-		TestQueryByID{id: 1, limit: 2, out: []snippet{
-			{ID: 2, Created: base.Add(8 * step), Modified: base.Add(8 * step), Name: "resonance cascade", Code: "code2"},
-			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(9 * step), Name: "gordon freeman", Code: "code3"},
+		TestQueryByID{id: defaultID, limit: 2, out: []snippet{
+			{ID: defaultID + 1, Created: base.Add(8 * step), Modified: base.Add(8 * step), Name: "resonance cascade", Code: "code2"},
+			{ID: defaultID + 2, Created: base.Add(9 * step), Modified: base.Add(9 * step), Name: "gordon freeman", Code: "code3"},
 		}}, "", step,
 	}, {
 		TestUpdate{in: snippet{
-			ID: 3, Code: "code3a",
-		}, id: 3}, "", step,
+			ID: defaultID + 2, Code: "code3a",
+		}, id: defaultID + 2}, "", step,
 	}, {
 		TestUpdate{in: snippet{
-			ID: 9, Code: "not found",
-		}, id: 9}, "IsNotFound", step,
+			ID: defaultID + 8, Code: "not found",
+		}, id: defaultID + 8}, "IsNotFound", step,
 	}, {
 		TestUpdate{in: snippet{
-			ID: 9, Code: "mismatching id",
-		}, id: 3}, "IsAny", step,
+			ID: defaultID + 8, Code: "mismatching id",
+		}, id: defaultID + 2}, "IsAny", step,
 	}, {
 		TestUpdate{in: snippet{
 			ID: 0, Code: "invalid zero id",
 		}, id: 0}, "IsAny", step,
 	}, {
 		TestUpdate{in: snippet{
-			ID: 3, Code: "modified date", Modified: base,
-		}, id: 3}, "IsAny", step,
+			ID: defaultID + 2, Code: "modified date", Modified: base,
+		}, id: defaultID + 2}, "IsAny", step,
 	}, {
 		TestQueryByName{name: "resonance", limit: 10, out: []snippet{
-			{ID: 2, Created: base.Add(8 * step), Modified: base.Add(8 * step), Name: "resonance cascade", Code: "code2"},
+			{ID: defaultID + 1, Created: base.Add(8 * step), Modified: base.Add(8 * step), Name: "resonance cascade", Code: "code2"},
 		}}, "", step,
 	}, {
 		TestUpdate{in: snippet{
-			ID: 2, Name: "cascading failure",
-		}, id: 2}, "", step,
+			ID: defaultID + 1, Name: "cascading failure",
+		}, id: defaultID + 1}, "", step,
 	}, {
 		TestQueryByName{name: "resonance", limit: 10, out: []snippet{}}, "", step,
 	}, {
 		TestDelete{id: 0}, "IsAny", step,
 	}, {
-		TestDelete{id: 1}, "IsAny", step,
+		TestDelete{id: defaultID}, "IsAny", step,
 	}, {
-		TestDelete{id: 2}, "", step,
+		TestDelete{id: defaultID + 1}, "", step,
 	}, {
 		TestQueryByName{name: "cascad", limit: 10, out: []snippet{}}, "", step,
 	}, {
 		TestReopen{}, "", step,
 	}, {
 		TestQueryByName{name: "", limit: 10, out: []snippet{
-			{ID: 4, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
-			{ID: 1, Modified: base.Add(5 * step), Name: "Default snippet", Code: "code1"},
-			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
+			{ID: defaultID + 3, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
+			{ID: defaultID + 0, Modified: base.Add(5 * step), Name: "Default snippet", Code: "code1"},
+			{ID: defaultID + 2, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
 		}}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "joshua tree", Code: "code5"}, id: 5}, "", step,
+		TestCreate{in: snippet{Name: "joshua tree", Code: "code5"}, id: defaultID + 4}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "duplicate clone", Code: "code6"}, id: 6}, "", step,
+		TestCreate{in: snippet{Name: "duplicate clone", Code: "code6"}, id: defaultID + 5}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "duplicate clone", Code: "code7"}, id: 7}, "", step,
+		TestCreate{in: snippet{Name: "duplicate clone", Code: "code7"}, id: defaultID + 6}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "duplicate clone", Code: "code8"}, id: 8}, "", step,
+		TestCreate{in: snippet{Name: "duplicate clone", Code: "code8"}, id: defaultID + 7}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "burrow", Code: "code9"}, id: 9}, "", step,
+		TestCreate{in: snippet{Name: "burrow", Code: "code9"}, id: defaultID + 8}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "transport control protocol", Code: "code10"}, id: 10}, "", step,
+		TestCreate{in: snippet{Name: "transport control protocol", Code: "code10"}, id: defaultID + 9}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "user datagram protocol", Code: "code11"}, id: 11}, "", step,
+		TestCreate{in: snippet{Name: "user datagram protocol", Code: "code11"}, id: defaultID + 10}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "jasmine tea", Code: "code12"}, id: 12}, "", step,
+		TestCreate{in: snippet{Name: "jasmine tea", Code: "code12"}, id: defaultID + 11}, "", step,
 	}, {
 		TestReopen{}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "green tea", Code: "code13"}, id: 13}, "", step,
+		TestCreate{in: snippet{Name: "green tea", Code: "code13"}, id: defaultID + 12}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "cherry tea", Code: "code14"}, id: 14}, "", step,
+		TestCreate{in: snippet{Name: "cherry tea", Code: "code14"}, id: defaultID + 13}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "java tea", Code: "code15"}, id: 15}, "", step,
+		TestCreate{in: snippet{Name: "java tea", Code: "code15"}, id: defaultID + 14}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "delicious sticky rice", Code: "code16"}, id: 16}, "", step,
+		TestCreate{in: snippet{Name: "delicious sticky rice", Code: "code16"}, id: defaultID + 15}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "super duper ice cream", Code: "code17"}, id: 17}, "", step,
+		TestCreate{in: snippet{Name: "super duper ice cream", Code: "code17"}, id: defaultID + 16}, "", step,
 	}, {
-		TestCreate{in: snippet{Name: "ice cubes in the hot sun", Code: "code18"}, id: 18}, "", step,
+		TestCreate{in: snippet{Name: "ice cubes in the hot sun", Code: "code18"}, id: defaultID + 17}, "", step,
 	}, {
-		TestUpdate{in: snippet{ID: 6, Code: "code6a"}, id: 6}, "", 0,
+		TestUpdate{in: snippet{ID: defaultID + 5, Code: "code6a"}, id: defaultID + 5}, "", 0,
 	}, {
-		TestUpdate{in: snippet{ID: 7, Code: "code7a"}, id: 7}, "", 0,
+		TestUpdate{in: snippet{ID: defaultID + 6, Code: "code7a"}, id: defaultID + 6}, "", 0,
 	}, {
-		TestUpdate{in: snippet{ID: 8, Code: "code8a"}, id: 8}, "", step,
+		TestUpdate{in: snippet{ID: defaultID + 7, Code: "code8a"}, id: defaultID + 7}, "", step,
 	}, {
-		TestUpdate{in: snippet{ID: 18, Code: "code18a"}, id: 18}, "", step,
+		TestUpdate{in: snippet{ID: defaultID + 17, Code: "code18a"}, id: defaultID + 17}, "", step,
 	}, {
-		TestUpdate{in: snippet{ID: 1, Code: "code0a"}, id: 1}, "", step,
+		TestUpdate{in: snippet{ID: defaultID, Code: "code0a"}, id: defaultID}, "", step,
 	}, {
-		TestUpdate{in: snippet{ID: 10, Code: "code10a"}, id: 10}, "", step,
+		TestUpdate{in: snippet{ID: defaultID + 9, Code: "code10a"}, id: defaultID + 9}, "", step,
 	}, {
-		TestUpdate{in: snippet{ID: 11, Code: "code11a"}, id: 11}, "", step,
+		TestUpdate{in: snippet{ID: defaultID + 10, Code: "code11a"}, id: defaultID + 10}, "", step,
 	}, {
 		TestQueryByName{name: "duplicate ice", limit: 5, out: []snippet{
-			{ID: 16, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
-			{ID: 8, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
-			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
-			{ID: 6, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
-			{ID: 18, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
+			{ID: defaultID + 15, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
+			{ID: defaultID + 7, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
+			{ID: defaultID + 6, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
+			{ID: defaultID + 5, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
+			{ID: defaultID + 17, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
 		}}, "", step,
 	}, {
 		TestQueryByModified{limit: 5, out: []snippet{
-			{ID: 11, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
-			{ID: 10, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
-			{ID: 1, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
-			{ID: 18, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
-			{ID: 8, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
+			{ID: defaultID + 10, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
+			{ID: defaultID + 9, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
+			{ID: defaultID + 0, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
+			{ID: defaultID + 17, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
+			{ID: defaultID + 7, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
 		}}, "", step,
 	}, {
 		TestReopen{}, "", step,
 	}, {
-		TestQueryByModified{modified: base.Add(43 * step), id: 8, limit: 10, out: []snippet{
-			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
-			{ID: 6, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
-			{ID: 17, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
-			{ID: 16, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
-			{ID: 15, Created: base.Add(39 * step), Modified: base.Add(39 * step), Name: "java tea", Code: "code15"},
-			{ID: 14, Created: base.Add(38 * step), Modified: base.Add(38 * step), Name: "cherry tea", Code: "code14"},
-			{ID: 13, Created: base.Add(37 * step), Modified: base.Add(37 * step), Name: "green tea", Code: "code13"},
-			{ID: 12, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
-			{ID: 9, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
-			{ID: 5, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
+		TestQueryByModified{modified: base.Add(43 * step), id: defaultID + 7, limit: 10, out: []snippet{
+			{ID: defaultID + 6, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
+			{ID: defaultID + 5, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
+			{ID: defaultID + 16, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
+			{ID: defaultID + 15, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
+			{ID: defaultID + 14, Created: base.Add(39 * step), Modified: base.Add(39 * step), Name: "java tea", Code: "code15"},
+			{ID: defaultID + 13, Created: base.Add(38 * step), Modified: base.Add(38 * step), Name: "cherry tea", Code: "code14"},
+			{ID: defaultID + 12, Created: base.Add(37 * step), Modified: base.Add(37 * step), Name: "green tea", Code: "code13"},
+			{ID: defaultID + 11, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
+			{ID: defaultID + 8, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
+			{ID: defaultID + 4, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
 		}}, "", step,
 	}, {
-		TestQueryByModified{modified: base.Add(28 * step), id: 5, limit: 10, out: []snippet{
-			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
-			{ID: 4, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
+		TestQueryByModified{modified: base.Add(28 * step), id: defaultID + 4, limit: 10, out: []snippet{
+			{ID: defaultID + 2, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
+			{ID: defaultID + 3, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
 		}}, "", step,
 	}, {
-		TestQueryByModified{modified: base.Add(0 * step), id: 1, limit: 10, out: []snippet{}}, "", step,
+		TestQueryByModified{modified: base.Add(0 * step), id: defaultID, limit: 10, out: []snippet{}}, "", step,
 	}, {
 		TestQueryByModified{limit: 0}, "", step,
 	}, {
 		TestQueryByID{limit: 0}, "", step,
 	}, {
 		TestQueryByID{limit: -1, out: []snippet{
-			{ID: 1, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
-			{ID: 3, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
-			{ID: 4, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
-			{ID: 5, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
-			{ID: 6, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
-			{ID: 7, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
-			{ID: 8, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
-			{ID: 9, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
-			{ID: 10, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
-			{ID: 11, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
-			{ID: 12, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
-			{ID: 13, Created: base.Add(37 * step), Modified: base.Add(37 * step), Name: "green tea", Code: "code13"},
-			{ID: 14, Created: base.Add(38 * step), Modified: base.Add(38 * step), Name: "cherry tea", Code: "code14"},
-			{ID: 15, Created: base.Add(39 * step), Modified: base.Add(39 * step), Name: "java tea", Code: "code15"},
-			{ID: 16, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
-			{ID: 17, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
-			{ID: 18, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
+			{ID: defaultID + 0, Modified: base.Add(45 * step), Name: "Default snippet", Code: "code0a"},
+			{ID: defaultID + 2, Created: base.Add(9 * step), Modified: base.Add(14 * step), Name: "gordon freeman", Code: "code3a"},
+			{ID: defaultID + 3, Created: base.Add(10 * step), Modified: base.Add(10 * step), Name: "live free die hard", Code: "code4"},
+			{ID: defaultID + 4, Created: base.Add(28 * step), Modified: base.Add(28 * step), Name: "joshua tree", Code: "code5"},
+			{ID: defaultID + 5, Created: base.Add(29 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code6a"},
+			{ID: defaultID + 6, Created: base.Add(30 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code7a"},
+			{ID: defaultID + 7, Created: base.Add(31 * step), Modified: base.Add(43 * step), Name: "duplicate clone", Code: "code8a"},
+			{ID: defaultID + 8, Created: base.Add(32 * step), Modified: base.Add(32 * step), Name: "burrow", Code: "code9"},
+			{ID: defaultID + 9, Created: base.Add(33 * step), Modified: base.Add(46 * step), Name: "transport control protocol", Code: "code10a"},
+			{ID: defaultID + 10, Created: base.Add(34 * step), Modified: base.Add(47 * step), Name: "user datagram protocol", Code: "code11a"},
+			{ID: defaultID + 11, Created: base.Add(35 * step), Modified: base.Add(35 * step), Name: "jasmine tea", Code: "code12"},
+			{ID: defaultID + 12, Created: base.Add(37 * step), Modified: base.Add(37 * step), Name: "green tea", Code: "code13"},
+			{ID: defaultID + 13, Created: base.Add(38 * step), Modified: base.Add(38 * step), Name: "cherry tea", Code: "code14"},
+			{ID: defaultID + 14, Created: base.Add(39 * step), Modified: base.Add(39 * step), Name: "java tea", Code: "code15"},
+			{ID: defaultID + 15, Created: base.Add(40 * step), Modified: base.Add(40 * step), Name: "delicious sticky rice", Code: "code16"},
+			{ID: defaultID + 16, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
+			{ID: defaultID + 17, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
 		}}, "", step,
 	}}
 
