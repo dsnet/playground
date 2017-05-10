@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
-	"encoding/gob"
 	"fmt"
 	"go/format"
 	"io/ioutil"
@@ -69,33 +68,6 @@ func main() {
 		log.Fatalf("Walk error: %v", err)
 	}
 
-	// Gob encode the map.
-	be := new(bytes.Buffer)
-	ge := gob.NewEncoder(be)
-	if err := ge.Encode(m); err != nil {
-		log.Fatalf("gob.Encode error: %v", err)
-	}
-
-	// Gzip compress the gob data.
-	bz := new(bytes.Buffer)
-	wz, _ := gzip.NewWriterLevel(bz, gzip.BestCompression)
-	if _, err := wz.Write(be.Bytes()); err != nil {
-		log.Fatalf("gzip.Write error: %v", err)
-	}
-	if err := wz.Close(); err != nil {
-		log.Fatalf("gzip.Close error: %v", err)
-	}
-
-	// Base64 encode the compressed data.
-	bx := new(bytes.Buffer)
-	wx := base64.NewEncoder(base64.StdEncoding, bx)
-	if _, err := wx.Write(bz.Bytes()); err != nil {
-		log.Fatalf("base64.Write error: %v", err)
-	}
-	if err := wx.Close(); err != nil {
-		log.Fatalf("base64.Close error: %v", err)
-	}
-
 	// Generate and format the static source file.
 	template := `
 		// Copyright 2017 The Go Authors. All rights reserved.
@@ -109,22 +81,9 @@ func main() {
 		import (
 			"compress/gzip"
 			"encoding/base64"
-			"encoding/gob"
+			"io/ioutil"
 			"strings"
 		)
-
-		// staticFS is a mapping from file paths without the leading slash
-		// to the contents of the file (e.g. css/playground.css => data).
-		var staticFS = func() (m map[string][]byte) {
-			r := strings.NewReader("%s")
-			rx := base64.NewDecoder(base64.StdEncoding, r)
-			rz, _ := gzip.NewReader(rx)
-			gd := gob.NewDecoder(rz)
-			if err := gd.Decode(&m); err != nil {
-				panic(err)
-			}
-			return
-		}()
 
 		// mimeTypes is a mapping from file extensions to MIME types.
 		var mimeTypes = map[string]string{%s}
@@ -135,8 +94,19 @@ func main() {
 				return mimeTypes[p[i+1:]]
 			}
 			return ""
+		}
+
+		// staticFS is a mapping from file paths to the contents of a file.
+		var staticFS = map[string][]byte {%s}
+
+		func decompressBase64(s string) []byte {
+			r := strings.NewReader(s)
+			rx := base64.NewDecoder(base64.StdEncoding, r)
+			rz, _ := gzip.NewReader(rx)
+			b, _ := ioutil.ReadAll(rz)
+			return b
 		}`
-	gen := fmt.Sprintf(template, runtime.Version(), bx.Bytes(), formatMap(mimeTypes))
+	gen := fmt.Sprintf(template, runtime.Version(), formatMIMEs(mimeTypes), formatFiles(m))
 	out, err := format.Source([]byte(gen))
 	if err != nil {
 		log.Fatalf("format.Source error: %v", err)
@@ -153,14 +123,46 @@ func knownExtension(p string) bool {
 	return i >= 0 && mimeTypes[p[i+1:]] != ""
 }
 
-func formatMap(m map[string]string) string {
+func formatFiles(m map[string][]byte) string {
 	var ks, ss []string
 	for k := range m {
 		ks = append(ks, k)
 	}
 	sort.Strings(ks)
 	for _, k := range ks {
-		ss = append(ss, fmt.Sprintf("%q:%q", k, m[k]))
+		// Gzip compress the gob data.
+		bz := new(bytes.Buffer)
+		wz, _ := gzip.NewWriterLevel(bz, gzip.BestCompression)
+		if _, err := wz.Write(m[k]); err != nil {
+			log.Fatalf("gzip.Write error: %v", err)
+		}
+		if err := wz.Close(); err != nil {
+			log.Fatalf("gzip.Close error: %v", err)
+		}
+
+		// Base64 encode the compressed data.
+		bx := new(bytes.Buffer)
+		wx := base64.NewEncoder(base64.StdEncoding, bx)
+		if _, err := wx.Write(bz.Bytes()); err != nil {
+			log.Fatalf("base64.Write error: %v", err)
+		}
+		if err := wx.Close(); err != nil {
+			log.Fatalf("base64.Close error: %v", err)
+		}
+
+		ss = append(ss, fmt.Sprintf("%q:decompressBase64(%q),\n", k, bx.Bytes()))
 	}
-	return strings.Join(ss, ",")
+	return "\n" + strings.Join(ss, "")
+}
+
+func formatMIMEs(m map[string]string) string {
+	var ks, ss []string
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	for _, k := range ks {
+		ss = append(ss, fmt.Sprintf("%q:%q,\n", k, m[k]))
+	}
+	return "\n" + strings.Join(ss, "")
 }
