@@ -308,6 +308,10 @@ func TestDatabase(t *testing.T) {
 			{ID: defaultID + 16, Created: base.Add(41 * step), Modified: base.Add(41 * step), Name: "super duper ice cream", Code: "code17"},
 			{ID: defaultID + 17, Created: base.Add(42 * step), Modified: base.Add(44 * step), Name: "ice cubes in the hot sun", Code: "code18a"},
 		}}, "", step,
+	}, {
+		TestCreate{in: snippet{Name: "\n"}}, "IsRequestError", step,
+	}, {
+		TestUpdate{in: snippet{Name: "\n"}, id: defaultID + 5}, "IsRequestError", step,
 	}}
 
 	for i, tt := range tests {

@@ -289,7 +289,7 @@ func (db *database) QueryByName(name string, limit int) ([]snippet, error) {
 // If successful, this will return the ID of the new snippet.
 func (db *database) Create(s snippet) (int64, error) {
 	switch {
-	case s.Name == "":
+	case strings.TrimSpace(s.Name) == "":
 		return 0, requestError{errors.New("snippet name cannot be empty")}
 	case s.ID != 0:
 		return 0, requestError{errors.New("cannot assign ID when creating snippet")}
@@ -346,6 +346,8 @@ func (db *database) Update(s snippet, id int64) error {
 		return requestError{fmt.Errorf("snippet IDs do not match: %d != %d", id, s.ID)}
 	case s.ID == defaultID && s.Name != "" && s.Name != defaultName:
 		return requestError{errors.New("cannot change default snippet name")}
+	case s.Name != "" && strings.TrimSpace(s.Name) == "":
+		return requestError{errors.New("name cannot be blank")}
 	case !s.Modified.IsZero() || !s.Created.IsZero():
 		return requestError{errors.New("cannot set modified or created times")}
 	}
