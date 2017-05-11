@@ -222,11 +222,11 @@ func (pg *playground) serveLogin(w http.ResponseWriter, r *http.Request) {
 		if h := sha256.Sum256(append(pg.pwSalt[:], b...)); h == pg.pwHash {
 			pg.refreshAuth(w, r)
 			w.WriteHeader(http.StatusOK)
-			pg.log.Printf("authentication success for client at %s", r.RemoteAddr)
+			pg.log.Printf("authentication success for client at %s", remoteAddr(r))
 			return
 		}
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		pg.log.Printf("authentication failure for client at %s", r.RemoteAddr)
+		pg.log.Printf("authentication failure for client at %s", remoteAddr(r))
 		return
 	case matchRequest(r, reLogin, "GET") ||
 		matchRequest(r, reRoot, "GET"):
@@ -396,10 +396,10 @@ func (pg *playground) serveWebsocket(w http.ResponseWriter, r *http.Request) {
 	// Log the websocket for debugging.
 	cid := atomic.AddInt64(&pg.clientID, 1)
 	pg.log.Printf("websocket client %d at %s connected (%d active)",
-		cid, r.RemoteAddr, atomic.AddInt64(&pg.numActive, +1))
+		cid, remoteAddr(r), atomic.AddInt64(&pg.numActive, +1))
 	defer func() {
 		pg.log.Printf("websocket client %d at %s disconnected (%d active)",
-			cid, r.RemoteAddr, atomic.AddInt64(&pg.numActive, -1))
+			cid, remoteAddr(r), atomic.AddInt64(&pg.numActive, -1))
 	}()
 
 	// Abstractions of the connection to send JSON messages.
@@ -471,4 +471,14 @@ func (pg *playground) serveDynamic(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", b.mime)
 	w.Write(b.data)
+}
+
+func remoteAddr(r *http.Request) string {
+	if addr := r.Header.Get("X-Real-IP"); addr != "" {
+		return addr
+	}
+	if addr := r.Header.Get("X-Forwarded-For"); addr != "" {
+		return strings.Split(addr, ",")[0]
+	}
+	return r.RemoteAddr
 }
