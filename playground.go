@@ -207,7 +207,7 @@ func (pg *playground) isAuthenticated(w http.ResponseWriter, r *http.Request) bo
 func (pg *playground) refreshAuth(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "auth",
-		Value:   formatAuthToken(pg.pwHash[:], time.Now()),
+		Value:   formatAuthToken(pg.pwHash[:], time.Now().UTC()),
 		Path:    "/",
 		Expires: time.Now().Add(authExpirePeriod),
 		MaxAge:  int(authExpirePeriod / time.Second),
