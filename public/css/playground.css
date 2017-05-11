@@ -1,0 +1,25 @@
+/*
+Copyright 2017 The Go Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE.md file.
+*/
+
+body, html {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+}
+
+body {
+	background: #f8f8f8;
+	background-color: #ffffff;
+	font-family: 'Source Sans Pro', Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+}
+
+@font-face {
+	font-family: 'Source Sans Pro';
+	font-style: normal;
+	font-weight: 400;
+	src: local('Source Sans Pro'), local('SourceSansPro-Regular'), url('../font/source-sans-pro.woff') format('woff');
+}
