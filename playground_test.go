@@ -514,20 +514,12 @@ func TestAuthToken(t *testing.T) {
 	pw1 := sha256.Sum256([]byte("password1"))
 	pw2 := sha256.Sum256([]byte("password2"))
 
-	var tok1, tok2 authToken
-	now := time.Now().UTC().Round(time.Second)
-	tok1.SetTime(now)
-	tok1.Sign(pw1)
-	if !tok2.Parse(tok1.Format()) {
-		t.Error("roundtrip Format to Parse failure")
+	now := time.Now().UTC()
+	s := formatAuthToken(pw1[:], now)
+	if got := parseAuthToken(pw1[:], s); !now.Equal(got) {
+		t.Error("parseAuthToken: got %v, want %v", got, now)
 	}
-	if got := tok2.GetTime(); !got.Equal(now) {
-		t.Error("timestamp mismatch: got %v, want %v", got, now)
-	}
-	if !tok2.Verify(pw1) {
-		t.Error("unexpected Verify failure with good password")
-	}
-	if tok2.Verify(pw2) {
-		t.Error("unexpected Verify success with bad password")
+	if got := parseAuthToken(pw2[:], s); now.Equal(got) {
+		t.Error("unexpected parseAuthToken success with bad password")
 	}
 }

@@ -7,10 +7,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -156,32 +155,30 @@ const (
 	authExpirePeriod  = 7 * 24 * time.Hour // 1 week
 )
 
-// authToken is a 40-byte value where the first 8 bytes is the Unix timestamp
-// as a int64. The later 32 bytes is a SHA256 signature of the timestamp
-// signed by performing SHA256(pwHash+timestamp).
-type authToken [8 + sha256.Size]byte
+// formatAuthToken formats the Time as a signed string using HMAC.
+func formatAuthToken(key []byte, t time.Time) string {
+	bt, _ := t.UTC().MarshalBinary()
+	mac := hmac.New(sha256.New, key)
+	mac.Write(bt)
+	return fmt.Sprintf("%02x%x%x", len(bt), bt, mac.Sum(nil))
+}
 
-func (t *authToken) Parse(x string) bool {
-	b, err := hex.DecodeString(x)
-	copy((*t)[:], b)
-	return len(b) == len(*t) && err == nil
-}
-func (t *authToken) Format() string {
-	return hex.EncodeToString((*t)[:])
-}
-func (t *authToken) GetTime() time.Time {
-	return time.Unix(int64(binary.LittleEndian.Uint64((*t)[:8])), 0).UTC()
-}
-func (t *authToken) SetTime(ts time.Time) {
-	binary.LittleEndian.PutUint64((*t)[:8], uint64(ts.Unix()))
-}
-func (t *authToken) Verify(pw [sha256.Size]byte) bool {
-	h := sha256.Sum256(append(pw[:], (*t)[:8]...))
-	return bytes.Equal((*t)[8:], h[:])
-}
-func (t *authToken) Sign(pw [sha256.Size]byte) {
-	h := sha256.Sum256(append(pw[:], (*t)[:8]...))
-	copy((*t)[8:], h[:])
+// parseAuthToken parses and validates an encoded Time.
+// If this is an invalid token, then a zero time is returned.
+func parseAuthToken(key []byte, s string) time.Time {
+	b, err := hex.DecodeString(s)
+	if len(b) == 0 || int(b[0]) > len(b[1:]) || err != nil {
+		return time.Time{}
+	}
+	bt, bmac := b[1:1+b[0]], b[1+b[0]:]
+	mac := hmac.New(sha256.New, key)
+	mac.Write(bt)
+	var t time.Time
+	err = t.UnmarshalBinary(bt)
+	if !hmac.Equal(mac.Sum(nil), bmac) || err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 func (pg *playground) isAuthenticated(w http.ResponseWriter, r *http.Request) bool {
@@ -190,11 +187,11 @@ func (pg *playground) isAuthenticated(w http.ResponseWriter, r *http.Request) bo
 	}
 	for _, c := range r.Cookies() {
 		if c.Name == "auth" {
-			var tok authToken
-			if !tok.Parse(c.Value) || !tok.Verify(pg.pwHash) {
+			t := parseAuthToken(pg.pwHash[:], c.Value)
+			if t.IsZero() {
 				return false
 			}
-			d := time.Now().Sub(tok.GetTime())
+			d := time.Now().Sub(t)
 			if d > authExpirePeriod {
 				return false
 			}
@@ -208,12 +205,9 @@ func (pg *playground) isAuthenticated(w http.ResponseWriter, r *http.Request) bo
 }
 
 func (pg *playground) refreshAuth(w http.ResponseWriter, r *http.Request) {
-	var tok authToken
-	tok.SetTime(time.Now())
-	tok.Sign(pg.pwHash)
 	http.SetCookie(w, &http.Cookie{
 		Name:    "auth",
-		Value:   tok.Format(),
+		Value:   formatAuthToken(pg.pwHash[:], time.Now()),
 		Path:    "/",
 		Expires: time.Now().Add(authExpirePeriod),
 		MaxAge:  int(authExpirePeriod / time.Second),
