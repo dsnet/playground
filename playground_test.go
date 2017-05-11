@@ -104,6 +104,7 @@ func TestPlayground(t *testing.T) {
 		}
 	}
 
+	sf := fmt.Sprintf
 	httpTests := []struct {
 		label string
 
@@ -153,13 +154,13 @@ func TestPlayground(t *testing.T) {
 		checkBody:  bodyChecker(mimeTypes["html"], staticFS["html/playground.html"]),
 	}, {
 		label:      "GetDefaultSnippet",
-		url:        fmt.Sprintf("/snippets/%d", defaultID),
+		url:        sf("/snippets/%d", defaultID),
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody:  snippetChecker(snippet{ID: defaultID, Name: defaultName, Code: defaultCode}),
 	}, {
 		label:      "GetNotFound1",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+1),
+		url:        sf("/snippets/%d", defaultID+1),
 		method:     "GET",
 		wantStatus: http.StatusNotFound,
 	}, {
@@ -167,94 +168,94 @@ func TestPlayground(t *testing.T) {
 		url:        "/snippets",
 		method:     "POST",
 		ctype:      "application/json",
-		body:       []byte(fmt.Sprintf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+1, defaultID+1)),
+		body:       []byte(sf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+1, defaultID+1)),
 		wantStatus: http.StatusOK,
 		checkBody: snippetChecker(snippet{
 			ID:   defaultID + 1,
-			Name: fmt.Sprintf("snippet%d", defaultID+1),
-			Code: fmt.Sprintf("code%d", defaultID+1),
+			Name: sf("snippet%d", defaultID+1),
+			Code: sf("code%d", defaultID+1),
 		}),
 	}, {
 		label:      "CreateSnippet2",
 		url:        "/snippets",
 		method:     "POST",
 		ctype:      "application/json",
-		body:       []byte(fmt.Sprintf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+2, defaultID+2)),
+		body:       []byte(sf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+2, defaultID+2)),
 		wantStatus: http.StatusOK,
 		checkBody: snippetChecker(snippet{
 			ID:   defaultID + 2,
-			Name: fmt.Sprintf("snippet%d", defaultID+2),
-			Code: fmt.Sprintf("code%d", defaultID+2),
+			Name: sf("snippet%d", defaultID+2),
+			Code: sf("code%d", defaultID+2),
 		}),
 	}, {
 		label:      "CreateSnippet3",
 		url:        "/snippets",
 		method:     "POST",
 		ctype:      "application/json",
-		body:       []byte(fmt.Sprintf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+3, defaultID+3)),
+		body:       []byte(sf(`{"Name": "snippet%d", "Code": "code%d"}`, defaultID+3, defaultID+3)),
 		wantStatus: http.StatusOK,
 		checkBody: snippetChecker(snippet{
 			ID:   defaultID + 3,
-			Name: fmt.Sprintf("snippet%d", defaultID+3),
-			Code: fmt.Sprintf("code%d", defaultID+3),
+			Name: sf("snippet%d", defaultID+3),
+			Code: sf("code%d", defaultID+3),
 		}),
 	}, {
 		label:      "GetSnippet1",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+2),
+		url:        sf("/snippets/%d", defaultID+2),
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody: snippetChecker(snippet{
 			ID:   defaultID + 2,
-			Name: fmt.Sprintf("snippet%d", defaultID+2),
-			Code: fmt.Sprintf("code%d", defaultID+2),
+			Name: sf("snippet%d", defaultID+2),
+			Code: sf("code%d", defaultID+2),
 		}),
 	}, {
 		label:      "PutInvalidJSON",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+2),
+		url:        sf("/snippets/%d", defaultID+2),
 		method:     "PUT",
 		ctype:      "application/json",
 		body:       []byte("bad JSON"),
 		wantStatus: http.StatusBadRequest,
 	}, {
 		label:      "PutValidJSON",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+2),
+		url:        sf("/snippets/%d", defaultID+2),
 		method:     "PUT",
 		ctype:      "application/json",
-		body:       []byte(fmt.Sprintf(`{"Name": "snippet%d", "Code": "code%da"}`, defaultID+2, defaultID+2)),
+		body:       []byte(sf(`{"Name": "snippet%d", "Code": "code%da"}`, defaultID+2, defaultID+2)),
 		wantStatus: http.StatusOK,
 	}, {
 		label:      "GetSnippet2",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+2),
+		url:        sf("/snippets/%d", defaultID+2),
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody: snippetChecker(snippet{
 			ID:   defaultID + 2,
-			Name: fmt.Sprintf("snippet%d", defaultID+2),
-			Code: fmt.Sprintf("code%da", defaultID+2),
+			Name: sf("snippet%d", defaultID+2),
+			Code: sf("code%da", defaultID+2),
 		}),
 	}, {
 		label:      "DeleteNotFound",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+500),
+		url:        sf("/snippets/%d", defaultID+500),
 		method:     "DELETE",
 		wantStatus: http.StatusNotFound,
 	}, {
 		label:      "DeleteSnippet",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+1),
+		url:        sf("/snippets/%d", defaultID+1),
 		method:     "DELETE",
 		wantStatus: http.StatusOK,
 	}, {
 		label:      "GetNotFound2",
-		url:        fmt.Sprintf("/snippets/%d", defaultID+1),
+		url:        sf("/snippets/%d", defaultID+1),
 		method:     "GET",
 		wantStatus: http.StatusNotFound,
 	}, {
 		label:      "QueryByID",
-		url:        fmt.Sprintf(`/snippets?query={"ID":%d}`, defaultID+1),
+		url:        sf(`/snippets?query={"ID":%d}`, defaultID+1),
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody: snippetsChecker([]snippet{
-			{ID: defaultID + 2, Name: fmt.Sprintf("snippet%d", defaultID+2)},
-			{ID: defaultID + 3, Name: fmt.Sprintf("snippet%d", defaultID+3)},
+			{ID: defaultID + 2, Name: sf("snippet%d", defaultID+2)},
+			{ID: defaultID + 3, Name: sf("snippet%d", defaultID+3)},
 		}),
 	}, {
 		label:      "QueryByName",
@@ -262,20 +263,20 @@ func TestPlayground(t *testing.T) {
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody: snippetsChecker([]snippet{
-			{ID: defaultID + 2, Name: "snippet3"},
-			{ID: defaultID + 3, Name: "snippet4"},
+			{ID: defaultID + 2, Name: sf("snippet%d", defaultID+2)},
+			{ID: defaultID + 3, Name: sf("snippet%d", defaultID+3)},
 		}),
 	}, {
 		label: "QueryByModified",
 		url: func() string {
 			js, _ := json.Marshal(struct{ Modified time.Time }{time.Now().Add(time.Hour)})
-			return fmt.Sprintf(`/snippets?query=%s&queryBy=modified&allFields=true`, js)
+			return sf(`/snippets?query=%s&queryBy=modified&allFields=true`, js)
 		}(),
 		method:     "GET",
 		wantStatus: http.StatusOK,
 		checkBody: snippetsChecker([]snippet{
-			{ID: defaultID + 2, Name: "snippet3", Code: "code3a"},
-			{ID: defaultID + 3, Name: "snippet4", Code: "code4"},
+			{ID: defaultID + 2, Name: sf("snippet%d", defaultID+2), Code: sf("code%da", defaultID+2)},
+			{ID: defaultID + 3, Name: sf("snippet%d", defaultID+3), Code: sf("code%d", defaultID+3)},
 			{ID: defaultID, Name: "Default snippet", Code: defaultCode},
 		}),
 	}}
