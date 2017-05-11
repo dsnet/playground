@@ -44,19 +44,19 @@ const (
 // These constants define all possible actions.
 const (
 	// Sent by client to server.
-	actionFormat = "Format" // Server formats the Go source in the data
-	actionRun    = "Run"    // Server runs the Go source in the data
-	actionStop   = "Stop"   // Stop any on-going format or run actions
+	actionFormat = "format" // Server formats the Go source in the data
+	actionRun    = "run"    // Server runs the Go source in the data
+	actionStop   = "stop"   // Stop any on-going format or run actions
 
 	// Sent by server to client.
-	clearOutput   = "ClearOutput"   // Client clears the output console; has no data
-	markLines     = "MarkLines"     // Client highlights the specified lines; data is JSON list of integers
-	appendStdout  = "AppendStdout"  // Client appends the data as stdout from the server's action
-	appendStderr  = "AppendStderr"  // Client appends the data as stderr from the server's action
-	reportProfile = "ReportProfile" // Server informs client about new profile; data is JSON dict with "name" and "id" fields
-	statusStarted = "StatusStarted" // Server informs client that some action started; data is optional message
-	statusUpdate  = "StatusUpdate"  // Server informs client about some on-going action; data is required message
-	statusStopped = "StatusStopped" // Server informs client that some action stopped; data is optional message
+	clearOutput   = "clearOutput"   // Client clears the output console; has no data
+	markLines     = "markLines"     // Client highlights the specified lines; data is JSON list of integers
+	appendStdout  = "appendStdout"  // Client appends the data as stdout from the server's action
+	appendStderr  = "appendStderr"  // Client appends the data as stderr from the server's action
+	reportProfile = "reportProfile" // Server informs client about new profile; data is JSON dict with "name" and "id" fields
+	statusStarted = "statusStarted" // Server informs client that some action started; data is optional message
+	statusUpdate  = "statusUpdate"  // Server informs client about some on-going action; data is required message
+	statusStopped = "statusStopped" // Server informs client that some action stopped; data is optional message
 )
 
 type writerFunc func([]byte) (int, error)
