@@ -7,6 +7,8 @@ This tool provides the ability to save and load various code snippets,
 the ability to run Go code using arbitrary third-party packages,
 and the ability to run tests and benchmarks.
 
+![screenshot](doc/screenshot.png)
+
 Since the Playground executes arbitrary Go code on the server it is running from,
 there are obvious security implications. As a baseline, the Playground requires
 a password in order use the service. However, anyone using this is responsible
