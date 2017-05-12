@@ -1,0 +1,22 @@
+/*
+Copyright 2017 The Go Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE.md file.
+*/
+
+.cm-s-play .CodeMirror { color: #000; background-color: #fff; }
+.cm-s-play div.CodeMirror-selected { background: #def; }
+.cm-s-play .CodeMirror-line::selection, .cm-s-play .CodeMirror-line > span::selection, .cm-s-play .CodeMirror-line > span > span::selection { background: #def; }
+.cm-s-play .CodeMirror-line::-moz-selection, .cm-s-play .CodeMirror-line > span::-moz-selection, .cm-s-play .CodeMirror-line > span > span::-moz-selection { background: #def; }
+
+.cm-s-play .CodeMirror-gutters { background: #f8f8f8; color: #333; }
+.cm-s-play .CodeMirror-linenumber { color: #aaa; padding-left: 8px; }
+.cm-s-play .CodeMirror-cursor { border-left: 2px solid #222; }
+
+.cm-s-play .cm-keyword  { color: #36c; }
+.cm-s-play .cm-number   { color: #e63; }
+.cm-s-play .cm-variable { color: #000; }
+.cm-s-play .cm-operator { color: #678; }
+.cm-s-play .cm-comment  { color: #999; }
+.cm-s-play .cm-string   { color: #077; }
+.cm-s-play .cm-builtin  { color: #739; }

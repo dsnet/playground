@@ -5,4 +5,49 @@ license that can be found in the LICENSE.md file.
 -->
 
 <html>
+	<head>
+		<title>Go Playground</title>
+		<link rel="stylesheet" href="/static/css/playground.css">
+		<link rel="stylesheet" href="/static/css/sweetalert2.css">
+		<link rel="stylesheet" href="/static/css/sweetalert2-play.css">
+		<link rel="stylesheet" href="/static/css/codemirror.css">
+		<link rel="stylesheet" href="/static/css/codemirror-play.css">
+		<script src="/static/js/sweetalert2.js"></script>
+		<script src="/static/js/codemirror.js"></script>
+		<script src="/static/js/codemirror-go.js"></script>
+		<script src="/static/js/codemirror-activeline.js"></script>
+	</head>
+	<body>
+		<div id="leftPane">
+			<h1 id="title">Playground</h1>
+			<input id="snippetName" spellcheck="false" type="text" autocomplete="off" onfocusout="handleRename()" placeholder="Unsaved snippet">
+			<div id="snippetButtonGroup">
+				<button id="buttonNew" class="mainButton" type="button" onclick="handleNew()">New</button>
+				<button id="buttonSave" class="mainButton" type="button" onclick="handleSave()">Save As</button>
+				<button id="buttonDelete" class="mainButton" type="button" onclick="handleDelete()">Delete</button>
+			</div>
+			<div id="searchGroup">
+				<label id="searchLabel" for="snippetSearch">Listing:</label>
+				<input id="snippetSearch" name="snippetSearch" spellcheck="false" type="text" autocomplete="off" placeholder="Search snippets">
+			</div>
+			<ul id="snippetListing"></ul>
+		</div>
+		<div id="dragBarV"></div>
+		<div id="rightPane">
+			<div id="topPane">
+				<div id="executeButtonGroup">
+					<button id="buttonRun" class="mainButton" type="button" onclick="handleRun()">Run</button>
+					<button id="buttonFormat" class="mainButton" type="button" onclick="handleFormat()">Format</button>
+					<button id="buttonStop" class="mainButton" type="button" onclick="handleStop()" disabled>Stop</button>
+				</div>
+				<div id="helpButtonGroup">
+					<button id="buttonHelp" class="mainButton" type="button" onclick="handleHelp()">Help</button>
+				</div>
+			</div>
+			<textarea id="codeBox"></textarea>
+			<div id="dragBarH"></div>
+			<pre id="outputPane" tabindex="-1"></pre>
+		</div>
+	</body>
+	<script src="/static/js/playground.js"></script>
 </html>
