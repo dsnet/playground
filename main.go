@@ -51,7 +51,7 @@ The JSON configuration file takes the following form:
 	//  #!/bin/bash
 	//  read -s -p "Password: " PASSWORD && echo
 	//  PASSWORD_SALT=$(head -c 1024 /dev/urandom | sha256sum | head -c 64)
-	//  PASSWORD_HASH=$(echo -n "${PASSWORD_SALT}${PASSWORD}" | sha256sum | head -c 64)
+	//  PASSWORD_HASH=$(echo -n "$(echo $PASSWORD_SALT | xxd -r -p)${PASSWORD}" | sha256sum | head -c 64)
 	//  echo -en "PasswordSalt: $PASSWORD_SALT\nPasswordHash: $PASSWORD_HASH\n"
 	//  unset PASSWORD PASSWORD_SALT PASSWORD_HASH
 	//
