@@ -518,9 +518,9 @@ func TestAuthToken(t *testing.T) {
 	now := time.Now().UTC()
 	s := formatAuthToken(pw1[:], now)
 	if got := parseAuthToken(pw1[:], s); !now.Equal(got) {
-		t.Error("parseAuthToken: got %v, want %v", got, now)
+		t.Errorf("parseAuthToken: got %v, want %v", got, now)
 	}
 	if got := parseAuthToken(pw2[:], s); now.Equal(got) {
-		t.Error("unexpected parseAuthToken success with bad password")
+		t.Errorf("unexpected parseAuthToken success with bad password")
 	}
 }

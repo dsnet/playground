@@ -177,6 +177,12 @@ func (ex *executor) runCommand(w io.Writer, args ...string) bool {
 	cmd.Dir = ex.tmpDir
 	cmd.Stdout = ex.stdout
 	cmd.Stderr = io.MultiWriter(ex.stderr, w)
+	// TODO: Modules are disabled to force operating in GOPATH mode.
+	// Add proper support for moules in the future.
+	if cmd.Env == nil {
+		cmd.Env = append([]string(nil), os.Environ()...)
+	}
+	cmd.Env = append(cmd.Env, "GO111MODULE=off")
 	if err := cmd.Run(); err != nil {
 		ex.sendMsg(statusUpdate, fmt.Sprintf("Unexpected error: %v\n", err))
 		return false

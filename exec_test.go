@@ -237,9 +237,7 @@ func TestExecutor(t *testing.T) {
 			{statusStopped, ""},
 		},
 	}, {
-		label:  "RunTest",
-		action: actionRun,
-		data:   `package main; import "testing"; func Test(t *testing.T){t.Error("test error")}`,
+		data: `package main; import "testing"; func Test(t *testing.T){t.Error("test error")}`,
 		want: []message{
 			{statusStarted, ""},
 			{clearOutput, ""},
