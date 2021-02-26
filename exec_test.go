@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -130,6 +131,9 @@ func (mt *messageTester) SendMessage(action, data string) error {
 }
 
 func TestExecutor(t *testing.T) {
+	// TODO: These tests only pass on Go1.10. Make this less brittle.
+	isGo110 := runtime.Version() == "go1.10" || strings.HasPrefix(runtime.Version(), "go1.10.")
+
 	mt := newMessageTester(t)
 	bs := newBlobStore()
 	gcs := map[string]string{"go-alpha": "go", "go-beta": "go"}
@@ -139,6 +143,7 @@ func TestExecutor(t *testing.T) {
 	tests := []struct {
 		label string // Name of the test
 		long  bool   // Does this test take a long time?
+		skip  bool   // Skip this test?
 
 		action string
 		data   string
@@ -177,6 +182,7 @@ func TestExecutor(t *testing.T) {
 		},
 	}, {
 		label:  "RunInvalid",
+		skip:   !isGo110,
 		action: actionRun,
 		data:   "package main\n\n\nnot valid go",
 		want: []message{
@@ -238,6 +244,7 @@ func TestExecutor(t *testing.T) {
 		},
 	}, {
 		label:  "RunTest",
+		skip:   !isGo110,
 		action: actionRun,
 		data:   `package main; import "testing"; func Test(t *testing.T){t.Error("test error")}`,
 		want: []message{
@@ -435,7 +442,7 @@ func TestExecutor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			if testing.Short() && tt.long {
+			if (testing.Short() && tt.long) || tt.skip {
 				t.SkipNow()
 			}
 
