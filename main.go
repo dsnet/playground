@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/dsnet/golib/jsonfmt"
 	"golang.org/x/crypto/ssh/terminal"
@@ -275,18 +276,21 @@ func main() {
 	}
 	defer server.Close()
 	go func() {
-		var err error
-		if conf.TLSCertFile != "" || conf.TLSKeyFile != "" {
-			err = server.ListenAndServeTLS(conf.TLSCertFile, conf.TLSKeyFile)
-		} else {
-			err = server.ListenAndServe()
-		}
-		if err != nil {
-			select {
-			case <-ctx.Done(): // Ignore error when closing
-			default:
-				logger.Fatalf("ListenAndServe error: %v", err)
+		for {
+			var err error
+			if conf.TLSCertFile != "" || conf.TLSKeyFile != "" {
+				err = server.ListenAndServeTLS(conf.TLSCertFile, conf.TLSKeyFile)
+			} else {
+				err = server.ListenAndServe()
 			}
+			if err != nil {
+				select {
+				case <-ctx.Done(): // Ignore error when closing
+				default:
+					logger.Printf("ListenAndServe error: %v", err)
+				}
+			}
+			time.Sleep(30 * time.Second)
 		}
 	}()
 	<-ctx.Done()
