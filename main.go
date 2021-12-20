@@ -202,16 +202,9 @@ func loadConfig(path string) (conf config, logger *log.Logger, closer func() err
 	}
 
 	// Check security settings.
-	isRemote := !strings.HasPrefix(conf.ServeAddress, "localhost:")
 	hasPass := conf.PasswordSalt != "" || conf.PasswordHash != ""
-	hasSSL := conf.TLSCertFile != "" || conf.TLSKeyFile != ""
 	reHex := regexp.MustCompile(`^[0-9a-fA-F]{64}$`) // SHA256 hash in hex
-	switch {
-	case !hasSSL && isRemote:
-		logger.Fatal("TLS must be enabled when binding to remote-visible address")
-	case !hasPass && isRemote:
-		logger.Fatal("password must be set when binding to remote-visible address")
-	case hasPass && !(reHex.MatchString(conf.PasswordSalt) && reHex.MatchString(conf.PasswordHash)):
+	if hasPass && !(reHex.MatchString(conf.PasswordSalt) && reHex.MatchString(conf.PasswordHash)) {
 		logger.Fatal("PasswordSalt and PasswordHash must be 32 byte long hex-strings")
 	}
 
