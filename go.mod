@@ -6,5 +6,5 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/dsnet/golib/jsonfmt v1.0.0
 	github.com/gorilla/websocket v1.4.2
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/crypto v0.1.0
 )
